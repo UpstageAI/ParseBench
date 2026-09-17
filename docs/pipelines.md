@@ -210,6 +210,31 @@ Hosted document-parsing API. Sign up at [oi-parser.ai](https://oi-parser.ai/) to
 
 ---
 
+### Upstage Document Parse
+
+| Pipeline | Description | Env Var |
+|---|---|---|
+| `upstage_dpe_v2` | Document Parse nightly alias in enhanced mode, with forced OCR, chart recognition and coordinates enabled | `UPSTAGE_API_KEY` |
+
+Install with `uv sync --extra upstage`. The provider renders the benchmark page
+to a 300 DPI PNG and sends it to `https://api.upstage.ai/v1/document-digitization`;
+set `UPSTAGE_BASE_URL` to
+override the full URL. The pipeline intentionally uses
+the server-managed `document-parse-nightly` alias so a model rollout behind the
+alias does not require a client change. HTML is preserved for formatting,
+merged tables and chart data. Element
+coordinates and contents are retained for Visual Grounding.
+
+```bash
+uv run parse-bench run upstage_dpe_v2 --test --max_concurrent 2
+uv run parse-bench run upstage_dpe_v2 --max_concurrent 10 --output_dir output/upstage-dpe-v2-YYYYMMDD
+```
+
+The integration records a public price of $0.03 per page in each result.
+Retain raw responses, effective request settings, timestamps, dataset revision
+and the ParseBench commit. Use a fresh output directory when changing the
+model or options so cached results are not mixed.
+
 ## Self-hosted Model Pipelines
 
 These pipelines require you to deploy the model on your own infrastructure (e.g., via vLLM, Modal, etc.) and set the endpoint URL in `.env`.

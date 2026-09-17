@@ -54,6 +54,7 @@ _PROVIDER_MODULES = [
     "textract",
     "unlimitedocr",
     "unstructured",
+    "upstage",
     "warp_ingest",
     "oi_parser",
 ]

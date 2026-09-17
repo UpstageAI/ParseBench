@@ -19,6 +19,25 @@ from parse_bench.schemas.product import ProductType
 def register_parse_pipelines(register_fn) -> None:  # type: ignore[no-untyped-def]
     """Register all parse-related pipelines."""
 
+    register_fn(
+        PipelineSpec(
+            pipeline_name="upstage_dpe_v2",
+            provider_name="upstage",
+            product_type=ProductType.PARSE,
+            config={
+                # DPE v2 is deployed behind this server-managed alias, so the
+                # integration stays unchanged when the new model goes live.
+                "model": "document-parse-nightly",
+                "mode": "enhanced",
+                "ocr": "force",
+                "chart_recognition": True,
+                "cost_per_page_usd": 0.03,
+                "rasterize_pdf_dpi": 300,
+                "timeout": 600,
+            },
+        )
+    )
+
     # =========================================================================
     # LlamaParse Production Pipelines (V2 SDK)
     # =========================================================================

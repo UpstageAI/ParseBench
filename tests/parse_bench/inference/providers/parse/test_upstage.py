@@ -80,6 +80,106 @@ def test_normalize_preserves_api_html_pages_and_layout(provider: UpstageDocument
     assert result.output.layout_pages[1].items[0].html == "<table><tr><td>A</td></tr></table>"
 
 
+def test_normalize_exposes_table_and_chart_semantics(provider: UpstageDocumentParseProvider) -> None:
+    elements = [
+        {
+            **element("caption", "<p>Quarterly revenue</p>"),
+            "content": {
+                "html": "<p>Quarterly revenue</p>",
+                "markdown": "Quarterly revenue",
+                "text": "Quarterly revenue",
+            },
+        },
+        {
+            **element("chart", ""),
+            "content": {
+                "html": (
+                    '<figure><figcaption><p class="chart-description">Revenue by region</p>'
+                    '<p class="chart-ocr-text">North\n2025</p></figcaption>'
+                    '<table><tr><td scope="col">Year</td><td scope="col">North</td></tr>'
+                    "<tr><td>2025</td><td>42</td></tr></table></figure>"
+                ),
+                "text": "North 2025 42",
+            },
+        },
+    ]
+
+    markdown = provider.normalize(raw({"elements": elements})).output.markdown
+
+    assert "<th" in markdown
+    assert "Quarterly revenue" in markdown
+    assert "Revenue by region" in markdown
+    assert "<caption>" in markdown
+
+
+def test_normalize_recovers_flat_heading_hierarchy_and_code_language(
+    provider: UpstageDocumentParseProvider,
+) -> None:
+    elements = [
+        {
+            **element(
+                "heading1",
+                "<h1>Main title</h1>",
+                coordinates=[
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.8, "y": 0.1},
+                    {"x": 0.8, "y": 0.2},
+                    {"x": 0.1, "y": 0.2},
+                ],
+            ),
+            "content": {"html": "<h1>Main title</h1>", "markdown": "# Main title", "text": "Main title"},
+        },
+        {
+            **element(
+                "heading1",
+                "<h1>Subsection</h1>",
+                coordinates=[
+                    {"x": 0.1, "y": 0.3},
+                    {"x": 0.4, "y": 0.3},
+                    {"x": 0.4, "y": 0.32},
+                    {"x": 0.1, "y": 0.32},
+                ],
+            ),
+            "content": {"html": "<h1>Subsection</h1>", "markdown": "# Subsection", "text": "Subsection"},
+        },
+        {
+            **element("code", "<pre><code>print('ok')</code></pre>"),
+            "content": {
+                "html": "<pre><code>print('ok')</code></pre>",
+                "markdown": "```\nprint('ok')\n```",
+                "text": "print('ok')",
+            },
+        },
+    ]
+
+    markdown = provider.normalize(raw({"elements": elements})).output.markdown
+
+    assert markdown.startswith("# Main title\n\n## Subsection")
+    assert "```python" in markdown
+
+
+@pytest.mark.parametrize(
+    ("code", "language"),
+    [
+        ('host\n{\n  "name": "demo",\n  "version": "1"\n}', "json"),
+        ("parallel.initialize(int n,int m);", "cpp"),
+    ],
+)
+def test_normalize_detects_code_language(provider: UpstageDocumentParseProvider, code: str, language: str) -> None:
+    code_element = {
+        **element("code", f"<pre><code>{code}</code></pre>"),
+        "content": {
+            "html": f"<pre><code>{code}</code></pre>",
+            "markdown": f"```\n{code}\n```",
+            "text": code,
+        },
+    }
+
+    markdown = provider.normalize(raw({"elements": [code_element]})).output.markdown
+
+    assert markdown.startswith(f"```{language}\n")
+
+
 def test_layout_adapter_and_label_mapping(provider: UpstageDocumentParseProvider) -> None:
     result = provider.normalize(raw({"elements": [element("heading3", "<h3>Title</h3>")]}))
     adapter = create_layout_adapter_for_result(result)

@@ -1,6 +1,5 @@
 """Provider for the Upstage Document Parse API."""
 
-import html
 import io
 import json
 import math
@@ -24,27 +23,10 @@ from parse_bench.schemas.pipeline import PipelineSpec
 from parse_bench.schemas.pipeline_io import InferenceRequest, InferenceResult, RawInferenceResult
 from parse_bench.schemas.product import ProductType
 
+from .upstage_normalization import element_html, element_text, normalize_elements
+
 _DEFAULT_ENDPOINT = "https://api.upstage.ai/v1/document-digitization"
 _PDF_RENDER_LOCK = threading.Lock()
-
-
-def _element_text(element: dict[str, Any]) -> str:
-    content = element.get("content") or {}
-    return str(content.get("text") or content.get("markdown") or "")
-
-
-def _element_html(element: dict[str, Any]) -> str:
-    content = element.get("content") or {}
-    return str(content.get("html") or content.get("markdown") or html.escape(_element_text(element)))
-
-
-def _element_markup(element: dict[str, Any]) -> str:
-    """Use Markdown for text and HTML where table structure must be retained."""
-    content = element.get("content") or {}
-    category = str(element.get("category") or "").lower()
-    if category in {"table", "chart"}:
-        return _element_html(element)
-    return str(content.get("markdown") or content.get("html") or html.escape(_element_text(element)))
 
 
 def _layout_segment(element: dict[str, Any]) -> LayoutSegmentIR | None:
@@ -218,18 +200,18 @@ class UpstageDocumentParseProvider(Provider):
         pages: list[PageIR] = []
         layout_pages: list[ParseLayoutPageIR] = []
         for page_number, elements in sorted(elements_by_page.items()):
-            page_markup = "\n\n".join(_element_markup(element) for element in elements)
+            rendered_elements = normalize_elements(elements)
+            page_markup = "\n\n".join(rendered_elements)
             items: list[LayoutItemIR] = []
-            for element in elements:
-                source_html = _element_html(element)
-                rendered = _element_markup(element)
+            for element, rendered in zip(elements, rendered_elements, strict=True):
+                source_html = element_html(element)
                 segment = _layout_segment(element)
                 items.append(
                     LayoutItemIR(
                         type=str(element.get("category") or "paragraph"),
                         md=rendered,
                         html=source_html,
-                        value=_element_text(element),
+                        value=element_text(element),
                         bbox=segment,
                         layout_segments=[segment] if segment else [],
                     )
